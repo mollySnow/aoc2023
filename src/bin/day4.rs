@@ -1,10 +1,10 @@
-use std::str::FromStr;
+use std::{str::FromStr, collections::HashMap};
 
 #[derive(Debug)]
 struct Card {
     id: u32,
-    winnings_numbers: Vec<u32>,
-    numbers: Vec<u32>,
+    wins: u32,
+    points: u32,
 }
 
 impl From<&str> for Card {
@@ -16,42 +16,59 @@ impl From<&str> for Card {
         let (_, value) = aoc2023::utils::take_char(value, ':').unwrap();
         let (_, value) = aoc2023::utils::take_whitespace(value).unwrap();
         let (winnings_numbers, value) = aoc2023::utils::take_list(value, aoc2023::utils::take_number, aoc2023::utils::take_whitespace).unwrap();
-        let winnings_numbers = winnings_numbers.iter().map(|&x| u32::from_str(x).unwrap()).collect();
+        let winnings_numbers: Vec<u32> = winnings_numbers.iter().map(|&x| u32::from_str(x).unwrap()).collect();
         let (_, value) = aoc2023::utils::take_char(value, '|').unwrap();
         let (_, value) = aoc2023::utils::take_whitespace(value).unwrap();
         let (numbers, _) = aoc2023::utils::take_list(value, aoc2023::utils::take_number, aoc2023::utils::take_whitespace).unwrap();
-        let numbers = numbers.iter().map(|&x| u32::from_str(x).unwrap()).collect();
+        let numbers: Vec<u32> = numbers.iter().map(|&x| u32::from_str(x).unwrap()).collect();
+
+        let mut wins = 0;
+        let mut points = 0;
+        for wnumber in winnings_numbers.iter() {
+            for number in numbers.iter() {
+                if wnumber == number {
+                    if wins == 0 {
+                        wins = 1;
+                        points = 1;
+                    } else {
+                        wins += 1;
+                        points *= 2;
+                    }
+                }
+            }
+        }
         Card {
             id,
-            winnings_numbers,
-            numbers,
+            wins,
+            points
         }
     }
 }
 
 fn part1(input: &str) -> u32 {
-    let cards = input.lines().map(Card::from).collect::<Vec<_>>();
-    let mut points = 0;
-    for card in cards.iter() {
-        let mut card_points = 0;
-        for wnumber in card.winnings_numbers.iter() {
-            for number in card.numbers.iter() {
-                if wnumber == number {
-                    if card_points == 0 {
-                        card_points = 1;
-                    } else {
-                        card_points *= 2;
-                    }
-                }
-            }
-        }
-        points += card_points;
-    }
-    points
+    input.lines().map(Card::from).map(|c| c.points).sum()
 }
 
+fn part2(input: &str) -> u32 {
+    let mut map: HashMap<u32, u32> = HashMap::new();
+    let cards = input.lines().map(Card::from).collect::<Vec<_>>();
+
+    for card in cards {
+        let card_count = map.entry(card.id).or_insert(1).clone();
+        for i in 1..=card.wins {
+            let won_card_id = card.id + i;
+            *map.entry(won_card_id).or_insert(1) += card_count;
+        }
+    }
+    map.values().sum()
+}
+    
+
 fn main() {
+    aoc2023::utils::run(EXAMPLE, part1, EXAMPLE_PART_1);
+    aoc2023::utils::run(EXAMPLE, part2, EXAMPLE_PART_2);
     aoc2023::utils::run(INPUT, part1, INPUT_PART_1);
+    aoc2023::utils::run(INPUT, part2, INPUT_PART_2);
 }
 
 const EXAMPLE: &str = r#"Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
@@ -61,9 +78,11 @@ Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
 Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
 Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11"#;
 
-const EXAMPLE_ANS: Option<u32> = Some(13);
+const EXAMPLE_PART_1: Option<u32> = Some(13);
+const EXAMPLE_PART_2: Option<u32> = Some(30);
 
-const INPUT_PART_1: Option<u32> = None;
+const INPUT_PART_2: Option<u32> = Some(5921508);
+const INPUT_PART_1: Option<u32> = Some(18653);
 const INPUT: &str = r#"Card   1: 66 92  4 54 39 76 49 27 61 56 | 66 59 85 54 61 86 37 49  6 18 81 39  4 56  2 48 76 72 71 25 27 67 10 92 13
 Card   2:  8  9 21 99 15 84 39 47 63 18 | 10 50 55 75 78 28 47 19 63 81  8 61  5 66  3  7 12 27 33  9 16 39 17  4 64
 Card   3: 85 17 43 97 49 48 24 72 64 42 | 91 94 18 23 45 95 77  8  5 13 65 66 96 47 86 93 90 98 67 50 20 73 99 32 15

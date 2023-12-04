@@ -10,6 +10,7 @@ pub mod utils {
             if answer == correct {
                 println!("Correct!");
             } else {
+                println!("Suggested: {:?}", answer);
                 println!("Incorrect! Correct answer: {:?}", correct);
             }
         } else {
@@ -32,6 +33,14 @@ pub mod utils {
 
     pub fn take_word<'a>(input: &'a str, word: &'static str) -> Option<(&'a str, &'a str)> {
         if input.starts_with(word) {
+            Some((word, &input[word.len()..]))
+        } else {
+            None
+        }
+    }
+
+    pub fn take_w(word: &'static str) -> impl Fn(&str) -> Option<(&str, &str)> {
+        move |input: &str| if input.starts_with(word) {
             Some((word, &input[word.len()..]))
         } else {
             None
