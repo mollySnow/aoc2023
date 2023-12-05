@@ -172,21 +172,9 @@ fn part2(input: &str) -> u32 {
     }).sum()
 }
 
-fn run(part: fn(&str) -> u32, input: &str, answer: Option<u32>) {
-    let result = part(input);
-    if let Some(ans) = answer {
-        if ans != result {
-            println!("Wrong answer: {} != {}", ans, result);
-        } else {
-            println!("Correct answer: {}", ans);
-        }
-    } else {
-        println!("Current: {}", result);
-    }
-}
-
 fn main() {
-    run(part2, INPUT, None);
+    aoc2023::utils::run(INPUT, part1, ANSWER_PART_1);
+    aoc2023::utils::run(INPUT, part2, ANSWER_PART_2);
 }
 
 
@@ -202,6 +190,7 @@ const EXAMPLE_2: &str = r#"467..114..
 ...$.*....
 .664.598.."#;
 
+const ANSWER_PART_2: Option<u32> = Some(76314915);
 const ANSWER_PART_1: Option<u32> = Some(544433);
 const INPUT: &str = r#".........398.............551.....................452..................712.996.................646.40...1.....875..958.553...................
 ..................................661..-844......*.../781...835..#163....*.......698.239.........*.....*.............*............*57.......
