@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
+use rayon::prelude::*;
 
 use nom::{IResult, combinator::map, sequence::tuple, character::{complete::{alpha1, multispace1, digit1}, self}, bytes::complete::tag, multi::separated_list1};
 
@@ -9,39 +10,6 @@ struct MapRegistry<'a> {
     source: &'a str,
     destination: &'a str,
     rule_data: Vec<(u64, u64, u64)>,
-}
-
-fn parse_map(input: &str) -> R<MapRegistry> {
-    let (input, (source, _, destination, _, _)) = tuple((alpha1, tag("-to-"), alpha1, tag(" map:"), multispace1))(input)?;
-    let (input, values) = parse_u64s(input)?;
-    let mut iter = values.iter();
-    let mut rule_data = Vec::new();
-    println!("source: {}, destination: {}", source, destination);
-
-    loop {
-        let Some(dest_range_start) = iter.next() else {
-            break;
-        };
-        let Some(source_range_start) = iter.next() else {
-            break;
-        };
-        let Some(range) = iter.next() else {
-            break;
-        };
-
-        rule_data.push((*dest_range_start, *source_range_start, *range));
-    }
-
-    Ok((input, MapRegistry {
-        source,
-        destination,
-        // map,
-        rule_data,
-    }))
-}
-
-fn parse_many_maps(input: &str) -> R<Vec<MapRegistry>> {
-    separated_list1(multispace1, parse_map)(input)
 }
 
 impl<'a> MapRegistry<'a> {
@@ -63,7 +31,48 @@ impl<'a> MapRegistry<'a> {
     }
 }
 
-fn calculate<'a, I>(seeds: I, regs: &[MapRegistry]) -> u64 where I: IntoIterator<Item=u64> {
+fn parse_u64s(input: &str) -> R<Vec<u64>> {
+    separated_list1(multispace1, map(digit1, |n: &str| n.parse::<u64>().unwrap()))(input)
+}
+
+fn parse_input(input: &str) -> R<Vec<u64>> {
+    let (input, _) = tag("seeds: ")(input)?;
+    parse_u64s(input)
+}
+
+fn parse_map(input: &str) -> R<MapRegistry> {
+    let (input, (source, _, destination, _, _)) = tuple((alpha1, tag("-to-"), alpha1, tag(" map:"), multispace1))(input)?;
+    let (input, values) = parse_u64s(input)?;
+    let mut iter = values.iter();
+    let mut rule_data = Vec::new();
+
+    loop {
+        let Some(dest_range_start) = iter.next() else {
+            break;
+        };
+        let Some(source_range_start) = iter.next() else {
+            break;
+        };
+        let Some(range) = iter.next() else {
+            break;
+        };
+
+        rule_data.push((*dest_range_start, *source_range_start, *range));
+    }
+
+    Ok((input, MapRegistry {
+        source,
+        destination,
+        rule_data,
+    }))
+}
+
+fn parse_many_maps(input: &str) -> R<Vec<MapRegistry>> {
+    separated_list1(multispace1, parse_map)(input)
+}
+
+
+fn calculate(seeds: Range<u64>, regs: &[MapRegistry]) -> u64 {
     let lookup = regs.iter().map(|reg| (reg.source, reg)).collect::<HashMap<&str, &MapRegistry>>();
     let mut locations = Vec::new();
 
@@ -83,16 +92,16 @@ fn calculate<'a, I>(seeds: I, regs: &[MapRegistry]) -> u64 where I: IntoIterator
     *locations.iter().min().unwrap()
 }
 
-fn part1(input: &str) -> u64 {
-    let Ok((input, seeds)) = parse_input(input) else {
-        panic!("Failed to parse seeds");
-    };
-    let Ok((input, regs)) = parse_many_maps(input.trim()) else {
-        panic!("Failed to parse maps");
-    };
-    assert_eq!(input, "");
-    calculate(seeds.into_iter(), &regs)
-}
+// fn part1(input: &str) -> u64 {
+//     let Ok((input, seeds)) = parse_input(input) else {
+//         panic!("Failed to parse seeds");
+//     };
+//     let Ok((input, regs)) = parse_many_maps(input.trim()) else {
+//         panic!("Failed to parse maps");
+//     };
+//     assert_eq!(input, "");
+//     calculate((0,1,2), &regs)
+// }
 
 fn part2(input: &str) -> u64 {
     let Ok((input, seeds)) = parse_input(input) else {
@@ -104,52 +113,22 @@ fn part2(input: &str) -> u64 {
 
     assert_eq!(input, "");
 
-    let range_sum = seeds.chunks(2).map(|r| r[1]).sum::<u64>();
-    println!("Range sum: {}", range_sum);
+    let seeds = seeds.chunks(2).map(|w| w[0]..(w[0] + w[1])).collect::<Vec<_>>();
 
-    let seeds = seeds.chunks(2).map(|w| w[0]..(w[0] + w[1]));
-
-    let mod_display = 1000;
-    let mut current = 0;
-    let mut v = u64::MAX;
-
-    for seed in seeds {
-        if current % mod_display == 0 {
-            println!("{}/{} complete", current, range_sum);
-        }
-        current += 1;
-        let c = calculate(seed, &regs);
-        if c < v {
-            v = c;
-        }
-    }
-    v
-    // seeds.map(|seed| calculate(seed, &regs)).min().unwrap()
+    seeds.par_iter().map(|seed| calculate(seed.clone(), &regs)).min().unwrap()
 }
 
-fn parse_u64s(input: &str) -> R<Vec<u64>> {
-    separated_list1(multispace1, map(digit1, |n: &str| n.parse::<u64>().unwrap()))(input)
-}
-
-fn parse_input(input: &str) -> R<Vec<u64>> {
-    let (input, _) = tag("seeds: ")(input)?;
-    parse_u64s(input)
-}
-
-// fn expand_seeds(seeds: &[u64]) -> Vec<u64> {
-//     let mut expanded = Vec::new();
-// }
 
 fn main() {
     // aoc2023::utils::run(INPUT, part1, INPUT_PART_1);
-    aoc2023::utils::run(INPUT, part2, INPUT_PART_2);
-    // aoc2023::utils::run(EXAMPLE, part2, EXAMPLE_PART_2);
+    // aoc2023::utils::run(INPUT, part2, INPUT_PART_2);
+    aoc2023::utils::run(EXAMPLE, part2, EXAMPLE_PART_2);
 }
 
 const EXAMPLE_PART_1: Option<u64> = Some(35);
 const EXAMPLE_PART_2: Option<u64> = Some(46);
 
-const INPUT_PART_2: Option<u64> = None;
+const INPUT_PART_2: Option<u64> = Some(136096660);
 const INPUT_PART_1: Option<u64> = Some(825516882);
 
 const EXAMPLE: &str = r#"seeds: 79 14 55 13
