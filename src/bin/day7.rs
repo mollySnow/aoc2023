@@ -1,7 +1,7 @@
 use nom::{IResult, multi::separated_list1, character::complete::{multispace1, space1}, sequence::tuple, bytes::complete::take_while};
 
 type R<'a,T> = IResult<&'a str, T>;
-type Hand<'a> = (u64, u32, u32, &'a str);
+type Hand<'a> = (u8, u32, u32, &'a str);
 
 fn calculate(input: Vec<Hand>) -> u32 {
     let mut vec = input;
@@ -106,7 +106,7 @@ fn parse2(input: &str) -> R<Hand> {
     let mut cards = [0u8;13];
     let mut current:usize = 0;
     let mut strength2 = 0;
-
+    let mut jack_count = 0;
 
     for c in hand.chars() {
         let (idx, v)  = match c {
@@ -115,9 +115,7 @@ fn parse2(input: &str) -> R<Hand> {
             'Q' => (10, 10),
             'J' => {
                 current += 1;
-                for i in 0..13 {
-                    cards[i] += 1;
-                };
+                jack_count += 1;
                 continue;
             },
             'T' => (9, 9),
@@ -136,8 +134,8 @@ fn parse2(input: &str) -> R<Hand> {
         cards[idx] += 1;
     };
 
-    let mut strength = 1;
 
+    let mut strength = 1;
     for i in 0..13 {
         match cards[i] {
             0 => continue,
@@ -146,22 +144,44 @@ fn parse2(input: &str) -> R<Hand> {
             3 => strength *= 3,
             4 => strength *= 5,
             5 => strength *= 7,
-            _ => {
-                println!("cards: {:?}", cards);
-                unreachable!()
-            },
+            _ => unreachable!(),
         }
     }
 
     let strength = match strength {
         7 => 10, // five of a kind
+        5 if jack_count > 0 => 10,
         5 => 5,  // four of a kind
+        6 if jack_count == 1 => 5,
+        6 if jack_count >= 2 => 10,
         6 => 4,  // full house
+        3 if jack_count == 1 => 5, // four of a kind
+        3 if jack_count >= 2 => 10,// five of a kind
         3 => 3,  // three of a kind
+        4 if jack_count == 1 => 4, // full hosue
+        4 if jack_count == 2 => 5, // four of a kind
+        4 if jack_count >= 3 => 10,// five of a kind
         4 => 2,  // two pair
+        2 if jack_count == 1 => 3, // three of a kind
+        2 if jack_count == 2 => 5,  // four of a kind
+        2 if jack_count >= 3 => 10, // five of a kind
         2 => 1,  // pair
+        1 if jack_count == 1 => 1, // pair
+        1 if jack_count == 2 => 3, // three of a kind
+        1 if jack_count == 3 => 5, // four of a kind
+        1 if jack_count >= 4 => 10, // five of a kind
         1 => 0, 
-        c => c,
+        c => {
+            assert_eq!(c, 0);
+            match jack_count {
+                5 => 10,
+                4 => 5,
+                3 => 3,
+                2 => 1,
+                1 => 0,
+                _ => unreachable!()
+            }
+        },
     };
 
     Ok((rest, (strength, bid, strength2, hand)))
@@ -173,7 +193,6 @@ fn main() {
 // KK677 28
 // KTJJT 220
 // QQQJA 483"#, part1, Some(6440));
-    // aoc2023::utils::run(INPUT, part1, Some(248569531));
 
 //     aoc2023::utils::run(r#"32T3K 765
 // T55J5 684
@@ -181,9 +200,8 @@ fn main() {
 // KTJJT 220
 // QQQJA 483"#, part2, Some(5905));
 
-    aoc2023::utils::run(INPUT, part2, None);
-
-
+    aoc2023::utils::run(INPUT, part1, Some(248569531));
+    aoc2023::utils::run(INPUT, part2, Some(250382098));
 }
 
 #[allow(dead_code)]
