@@ -1,34 +1,23 @@
-use std::str::FromStr;
-
-use nom::{IResult, multi::separated_list1, character::complete::{newline, digit1, space1}, sequence::pair, combinator::{map, recognize, opt}};
-use nom::character::complete::char;
+use nom::{IResult, multi::separated_list1, character::complete::{newline, space1, self}};
 
 type R<'a,T> = IResult<&'a str, T>;
 
 fn find_next(input: &[i32]) -> i32 {
-    let diff = {
-        let mut v = Vec::new();
-        for i in 0..input.len()-1 {
-            v.push(input[i+1] - input[i]);
-        }
-        v
-    };
-    let last = input.iter().last().expect("no last element");
-
-    if diff.iter().all(|i| *i == 0) {
-        *last
-    } else {
-        last + find_next(&diff)
+    if input.iter().all(|i| *i == 0) {
+        return 0;
     }
-}
 
-fn parse_line(input: &str) -> R<Vec<i32>> {
-    separated_list1(
-        space1, map(recognize(pair(opt(char('-')), digit1)), |i| FromStr::from_str(i).unwrap()))(input)
+    let last = input.last().expect("no last element");
+    let diff = input
+        .windows(2)
+        .map(|w| w[1]-w[0])
+        .collect::<Vec<i32>>();
+
+    last + find_next(&diff)
 }
 
 fn parse(input: &str) -> R<Vec<Vec<i32>>> {
-    separated_list1(newline, parse_line)(input)
+    separated_list1(newline, separated_list1(space1, complete::i32))(input)
 }
 
 fn part1(input: &str) -> i32 {
