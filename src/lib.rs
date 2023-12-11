@@ -1,3 +1,244 @@
+pub mod grid {
+    use std::ops::{Add, Sub};
+
+    pub struct CharGrid {
+        pub grid: Vec<Vec<char>>,
+        pub width: usize,
+        pub height: usize,
+    }
+
+    impl CharGrid {
+        pub fn new(input: &str) -> Self {
+            let width = input.lines().next().unwrap().len();
+            let height = input.lines().count();
+
+            let grid = input.lines().map(|l| l.chars().collect::<Vec<_>>()).collect::<Vec<_>>();
+            Self { grid, width, height }
+        }
+
+        pub fn path_to_string(&self, path: &Vec<Point>) -> String {
+            path.iter().map(|p| self.get_char(*p)).collect::<String>()
+        }
+
+        pub fn get_char(&self, pos: Point) -> char {
+            self.grid[pos.y as usize][pos.x as usize]
+        }
+
+        pub fn print(&self) {
+            for (x,line) in self.grid.iter().enumerate() {
+                print!("{:02}|", x);
+                for c in line.iter() {
+                    print!("{}", c);
+                }
+                println!();
+            }
+        }
+
+        pub fn points_where(&self, predicate: fn(char) -> bool) -> Vec<Point> {
+            let mut result = Vec::new();
+            for y in 0..self.height {
+                for x in 0..self.width {
+                    if predicate(self.grid[y][x]) {
+                        result.push(Point::new(x as i32, y as i32));
+                    }
+                }
+            }
+            result
+        }
+
+        pub fn rows_where(&self, predicate: fn(char) -> bool) -> Vec<usize> {
+            let mut result = Vec::new();
+            for y in 0..self.height {
+                let mut found = true;
+                for x in 0..self.width {
+                    found &= predicate(self.grid[y][x]);
+                }
+
+                if !found {
+                    continue;
+                }
+                result.push(y);
+            }
+            result
+        }
+
+        pub fn columns_where(&self, predicate: fn(char) -> bool) -> Vec<usize> {
+            let mut result = Vec::new();
+            for x in 0..self.width {
+                let mut found = true;
+                for y in 0..self.height {
+                    found &= predicate(self.grid[y][x]);
+                }
+                if !found {
+                    continue;
+                }
+                result.push(x);
+            }
+            result
+        }
+
+        pub fn clone_column(&mut self, x: usize) -> Result<(), String> {
+            for y in 0..self.height {
+                let c = self.grid[y].get(x).ok_or(format!("Column {} does not exist", x))?.clone();
+                self.grid[y].insert(x, c);
+            }
+            self.width += 1;
+            Ok(())
+        }
+
+        pub fn clone_row(&mut self, y: usize) -> Result<(), String> {
+            let row = self.grid.get(y).ok_or(format!("Row {} does not exist", y))?;
+            self.grid.insert(y, row.clone());
+            self.height += 1;
+            Ok(())
+        }
+
+
+        pub fn column_where(&self, predicate: fn(char) -> bool) -> Option<Vec<Point>> {
+            for x in 0..self.width {
+                let mut found = true;
+                for y in 0..self.height {
+                    found &= predicate(self.grid[y][x]);
+                }
+
+                if !found {
+                    let mut result = Vec::new();
+                    for y in 0..self.height {
+                        if predicate(self.grid[y][x]) {
+                            result.push(Point::new(x as i32, y as i32));
+                        }
+                    }
+                    return Some(result);
+                }
+            }
+            None
+        }
+
+        pub fn row_where(&self, predicate: fn(char) -> bool) -> Option<Vec<Point>> {
+            for y in 0..self.height {
+                let mut found = false;
+                for x in 0..self.width {
+                    found = found || predicate(self.grid[y][x]);
+                }
+
+                if found {
+                    let mut result = Vec::new();
+                    for x in 0..self.width {
+                        if predicate(self.grid[y][x]) {
+                            result.push(Point::new(x as i32, y as i32));
+                        }
+                    }
+                    return Some(result);
+                }
+            }
+            None
+        }
+
+
+        pub fn add_column(&mut self, c: char) {
+            for line in self.grid.iter_mut() {
+                line.push(c);
+            }
+            self.width += 1;
+        }
+
+    }
+
+
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub enum Direction {
+        North,
+        South,
+        East,
+        West,
+    }
+
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub struct Point {
+        pub x: i32,
+        pub y: i32,
+    }
+
+    impl Add for Point {
+        type Output = Point;
+
+        fn add(self, other: Point) -> Point {
+            Point::new(self.x + other.x, self.y + other.y)
+        }
+    }
+
+    impl Sub for Point {
+        type Output = Point;
+
+        fn sub(self, rhs: Self) -> Self::Output {
+            Point::new(self.x - rhs.x, self.y - rhs.y)
+        }
+    }
+
+    impl Point {
+        pub fn new(x: i32, y: i32) -> Self {
+            Self { x, y }
+        }
+
+        pub fn path_to(&self, to: &Point) -> Vec<Point> {
+            let mut path = Vec::new();
+            let mut current = *self;
+            while current != *to {
+                let dir = current.direction(to);
+                current = match dir {
+                    Direction::North => Point::new(current.x, current.y - 1),
+                    Direction::South => Point::new(current.x, current.y + 1),
+                    Direction::East => Point::new(current.x + 1, current.y),
+                    Direction::West => Point::new(current.x - 1, current.y),
+                };
+                path.push(current);
+            }
+
+            path
+        }
+
+        pub fn adjacent(&self) -> Vec<Point> {
+            if self.x == 0 && self.y == 0 {
+                return vec![Point::new(1, 0), Point::new(0, 1)];
+            }
+            if self.x == 0 {
+                return vec![Point::new(0, self.y - 1), Point::new(0, self.y + 1)];
+            }
+            if self.y == 0 {
+                return vec![Point::new(self.x - 1, 0), Point::new(self.x + 1, 0)];
+            }
+            vec![
+                Point::new(self.x - 1, self.y),
+                Point::new(self.x + 1, self.y),
+                Point::new(self.x, self.y - 1),
+                Point::new(self.x, self.y + 1),
+            ]
+        }
+
+        pub fn direction(&self, other: &Point) -> Direction {
+            if self.x == other.x {
+                if self.y > other.y {
+                    Direction::North
+                } else {
+                    Direction::South
+                }
+            } else {
+                if self.x > other.x {
+                    Direction::West
+                } else {
+                    Direction::East
+                }
+            }
+        }
+
+        pub fn distance(&self, other: &Point) -> i32 {
+            (self.x - other.x).abs() + (self.y - other.y).abs()
+        }
+    }
+}
+
 pub mod utils {
 
     pub fn run<TIn, TOut>(input: TIn, func: fn(TIn) -> TOut, ans: Option<TOut>) 

@@ -1,89 +1,13 @@
-use std::ops::{Add, Sub};
-use std::slice::Chunks;
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Point {
-    x: i32,
-    y: i32,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum Direction {
-    North,
-    South,
-    East,
-    West,
-}
-
-impl Point {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn adjacent(&self) -> Vec<Point> {
-        if self.x == 0 && self.y == 0 {
-            return vec![Point::new(1, 0), Point::new(0, 1)];
-        }
-        if self.x == 0 {
-            return vec![Point::new(0, self.y - 1), Point::new(0, self.y + 1)];
-        }
-        if self.y == 0 {
-            return vec![Point::new(self.x - 1, 0), Point::new(self.x + 1, 0)];
-        }
-        vec![
-            Point::new(self.x - 1, self.y),
-            Point::new(self.x + 1, self.y),
-            Point::new(self.x, self.y - 1),
-            Point::new(self.x, self.y + 1),
-        ]
-    }
-
-    fn direction(&self, other: &Point) -> Direction {
-        if self.x == other.x {
-            if self.y > other.y {
-                Direction::North
-            } else {
-                Direction::South
-            }
-        } else {
-            if self.x > other.x {
-                Direction::West
-            } else {
-                Direction::East
-            }
-        }
-    }
-}
-
-impl Add for Point {
-    type Output = Point;
-
-    fn add(self, other: Point) -> Point {
-        Point::new(self.x + other.x, self.y + other.y)
-    }
-}
-
-impl Sub for Point {
-    type Output = Point;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Point::new(self.x - rhs.x, self.y - rhs.y)
-    }
-}
+use aoc2023::grid::{Point, Direction, CharGrid};
 
 
-
-fn get_char(grid: &Vec<Vec<char>>, pos: Point) -> char {
-    grid[pos.y as usize][pos.x as usize]
-}
-
-fn get_next_position(grid: &Vec<Vec<char>>, current: Point, previous: Point) -> Option<Point> {
+fn get_next_position(g: &CharGrid, current: Point, previous: Point) -> Option<Point> {
     const NORTH: Point = Point { x: 0, y: -1 };
     const SOUTH: Point = Point { x: 0, y: 1 };
     const EAST:  Point = Point { x: 1, y: 0 };
     const WEST:  Point = Point { x: -1, y: 0 };
 
-    match get_char(grid, current) {
+    match g.get_char(current) {
         'F' => {
             if previous == current + SOUTH {
                 Some(current + EAST)
@@ -128,7 +52,7 @@ fn get_next_position(grid: &Vec<Vec<char>>, current: Point, previous: Point) -> 
         },
         'S' => {
             for adjacent in current.adjacent() {
-                let c = get_char(grid, adjacent);
+                let c = g.get_char(adjacent);
                 match current.direction(&adjacent) {
                     Direction::North if [ '|', 'F', '7' ].contains(&c) => return Some(adjacent),
                     Direction::South if [ '|', 'L', 'J' ].contains(&c) => return Some(adjacent),
@@ -143,116 +67,26 @@ fn get_next_position(grid: &Vec<Vec<char>>, current: Point, previous: Point) -> 
     }
 }
 
-fn find_enclosure(path: &mut Vec<Point>) -> Option<Vec<Point>> {
-    for (i, point) in path.iter().skip(1).enumerate() {
-        for adjacent in point.adjacent() {
-            if !path[..i].contains(&adjacent) {
-                continue;
-            }
-            let adjacent_index = path.iter().position(|p| p == &adjacent).unwrap();
-
-            return Some(path.drain(adjacent_index+1..=i).collect::<Vec<_>>());
-        }
-    }
-
-    None
-}
-
-fn create_grid(input: &str) -> Vec<Vec<char>> {
-    input.lines().map(|l| l.chars().collect::<Vec<_>>()).collect::<Vec<_>>()
-}
-
-fn find_path(grid: &Vec<Vec<char>>) -> Vec<Point> {
-    let start = grid.iter().enumerate().find_map(|(y, l)| l.iter().enumerate().find_map(|(x, c)| if *c == 'S' { Some(Point::new(x as i32,y as i32)) } else { None })).unwrap();
+fn find_path(g: &CharGrid) -> Vec<Point> {
+    let start = g.grid.iter().enumerate().find_map(|(y, l)| l.iter().enumerate().find_map(|(x, c)| if *c == 'S' { Some(Point::new(x as i32,y as i32)) } else { None })).unwrap();
     let mut res = Vec::new();
 
     res.push(start);
-    let (mut previous, mut current) = (start, get_next_position(&grid, start, start).unwrap());
+    let (mut previous, mut current) = (start, get_next_position(&g, start, start).unwrap());
 
     loop {
         if current == start {
             break;
         }
         res.push(current);
-        (previous, current) = (current, get_next_position(&grid, current, previous).unwrap());
+        (previous, current) = (current, get_next_position(&g, current, previous).unwrap());
     }
     res
-}
-
-fn print_grid(grid: &Vec<Vec<char>>) {
-    for line in grid {
-        for c in line {
-            print!("{}", c);
-        }
-        println!();
-    }
-}
-
-fn print_path(path: &Vec<Point>, grid: &Vec<Vec<char>>) {
-    let min_x = 0;
-    let max_x = grid[0].len() as i32;
-    let min_y = 0;
-    let max_y = grid.len() as i32;
-
-    for y in min_y..max_y {
-        for x in min_x..max_x {
-            let p = Point::new(x, y);
-            if path.contains(&p) {
-                print!("{}", get_char(grid, p));
-            } else {
-                print!(" ");
-            }
-        }
-        println!();
-    }
 }
 
 fn part1(input: &str) -> usize {
-    let grid = create_grid(input);
-    find_path(&grid).len() / 2
-}
-
-fn path_to_char(path: &Vec<Point>, grid: &Vec<Vec<char>>) -> Vec<char> {
-    path.iter().map(|p| get_char(grid, *p)).collect::<Vec<_>>()
-}
-
-fn path_to_directions(path: &Vec<Point>) -> Vec<Point> {
-    let mut res = Vec::new();
-    let mut previous = path[0];
-    res.push(Point::new(0, 0));
-    for p in path.iter().skip(1) {
-        res.push(*p - previous);
-        previous = *p;
-    }
-    res
-}
-
-fn path_to_corners(path: &Vec<Point>, grid: &Vec<Vec<char>>) -> Vec<Point> {
-    const CORNERS: [char; 5] = [ 'F', '7', 'J', 'L', 'S' ];
-    path.iter().filter(|p| CORNERS.contains(&get_char(grid, **p))).map(|p| *p).collect::<Vec<_>>()
-}
-
-fn set_grid(grid: &mut Vec<Vec<char>>, path: &Vec<Point>, c: char) {
-    for p in path {
-        grid[p.y as usize][p.x as usize] = c;
-    }
-}
-
-fn path_to_string(path: &Vec<Point>, grid: &Vec<Vec<char>>) -> String {
-    path.iter().map(|p| get_char(grid, *p)).collect::<String>()
-}
-
-fn calculate_area(vertices: &[Point]) -> i32 {
-    let n = vertices.len();
-    let mut area = 0;
-
-    for i in 0..n {
-        let p1 = vertices[i];
-        let p2 = vertices[(i + 1) % n];
-        area += p1.x * p2.y + 1 - p2.x * p1.y
-    }
-
-    (area.abs()) / 2
+    let g = CharGrid::new(input);
+    find_path(&g).len() / 2
 }
 
 fn create_intersections<'a>(path: &'a Vec<Point>, grid: &Vec<Vec<char>>) -> Vec<Vec<&'a Point>> {
@@ -267,7 +101,7 @@ fn create_intersections<'a>(path: &'a Vec<Point>, grid: &Vec<Vec<char>>) -> Vec<
     res
 }
 
-fn is_inside(point: &Point, intersections: &Vec<Vec<&Point>>, grid: &Vec<Vec<char>>) -> bool {
+fn is_inside(point: &Point, intersections: &Vec<Vec<&Point>>, grid: &CharGrid) -> bool {
     let line = &intersections[point.y as usize];
     if line.contains(&point) {
         return false;
@@ -276,7 +110,7 @@ fn is_inside(point: &Point, intersections: &Vec<Vec<&Point>>, grid: &Vec<Vec<cha
     let mut intersections = 0;
     let mut n = false;
     let mut u = false;
-    for c in line.iter().filter_map(|p| if p.x < point.x { Some(get_char(grid, **p)) } else { None }) {
+    for c in line.iter().filter_map(|p| if p.x < point.x { Some(grid.get_char(**p)) } else { None }) {
         match c {
             'F' => n = true,
             '7' | 'S' if n => n = false,
@@ -295,41 +129,19 @@ fn is_inside(point: &Point, intersections: &Vec<Vec<&Point>>, grid: &Vec<Vec<cha
         }
     }
 
-    if intersections % 2 == 1 {
-        let str = line.iter().filter_map(|p| if p.x < point.x { Some(get_char(grid, **p)) } else { None }).collect::<String>();
-        println!("{:?}: {}", point, str);
-    }
-
     intersections % 2 == 1
 }
 
-fn paint(grid: &mut Vec<Vec<char>>, path: &Vec<Point>) {
-    let x_max = grid[0].len() as i32;
-    let y_max = grid.len() as i32;
-    let intersections = create_intersections(&path, &grid);
-
-
-    for y in 0..y_max {
-        for x in 0..x_max {
-            let p = Point::new(x, y);
-            if is_inside(&p, &intersections, &grid) {
-                grid[y as usize][x as usize] = 'I';
-            }
-        }
-    }
-}
-
-fn count_inside(grid: &Vec<Vec<char>>, path: &Vec<Point>) -> i32 {
-    let x_max = grid[0].len() as i32;
-    let y_max = grid.len() as i32;
-    let intersections = create_intersections(&path, &grid);
-
+fn count_inside(g: &CharGrid, path: &Vec<Point>) -> i32 {
+    let x_max = g.grid[0].len() as i32;
+    let y_max = g.grid.len() as i32;
+    let intersections = create_intersections(&path, &g.grid);
 
     let mut sum = 0;
     for y in 0..y_max {
         for x in 0..x_max {
             let p = Point::new(x, y);
-            if is_inside(&p, &intersections, &grid) {
+            if is_inside(&p, &intersections, &g) {
                 sum += 1;
             }
         }
@@ -339,88 +151,15 @@ fn count_inside(grid: &Vec<Vec<char>>, path: &Vec<Point>) -> i32 {
 
 
 fn part2(input: &str) -> i32 {
-    let mut grid = create_grid(input);
-    let path = find_path(&grid);
-
-    let intersections = create_intersections(&path, &grid);
-
-    //print grid
-    println!("Grid:");
-    print_grid(&grid);
-
-    //print intersections
-    println!("Intersections:");
-    for line in intersections {
-        for p in line {
-            print!("{}", get_char(&grid, *p));
-        }
-        println!();
-    }
-
-    //print path
-    println!("Path:");
-    print_path(&path, &grid);
-
-    // paint(&mut grid, &path);
-
-
-    count_inside(&grid, &path)
+    let g  = CharGrid::new(input);
+    let path = find_path(&g);
+    count_inside(&g, &path)
 }
 
-fn calc() -> i32 {
-    9 * 7 + (-4* 3) + (3 * -4) + (-7 * 4) + (4 * 3) + (-5 * -9)
-}
 
 fn main() {
-
-//     aoc2023::utils::run(r#"..F7.
-// .FJ|.
-// SJ.L7
-// |F--J
-// LJ..."#, part1, Some(8));
-
-//     aoc2023::utils::run(r#".....
-// .S-7.
-// .|.|.
-// .L-J.
-// ....."#, part2, None);
-
-    aoc2023::utils::run(r#"...........
-.S-------7.
-.|F-----7|.
-.||.....||.
-.||.....||.
-.|L--7F-J|.
-.|...||..|.
-.L---JL--J.
-..........."#, part2, Some(5));
-
-    // aoc2023::utils::run(INPUT, part1, Some(6768));
-    // aoc2023::utils::run(INPUT, part1, Some(1772145754));
-    aoc2023::utils::run(INPUT, part2, None);
-
-//     aoc2023::utils::run(r#".F----7F7F7F7F-7....
-// .|F--7||||||||FJ....
-// .||.FJ||||||||L7....
-// FJL7L7LJLJ||LJ.L-7..
-// L--J.L7...LJS7F-7L7.
-// ....F-J..F7FJ|L7L7L7
-// ....L7.F7||L7|.L7L7|
-// .....|FJLJ|FJ|F7|.LJ
-// ....FJL-7.||.||||...
-// ....L---J.LJ.LJLJ..."#, part2, None);
-
-//     aoc2023::utils::run(r#"FF7FSF7F7F7F7F7F---7
-// L|LJ||||||||||||F--J
-// FL-7LJLJ||||||LJL-77
-// F--JF--7||LJLJ7F7FJ-
-// L---JF-JLJ.||-FJLJJ7
-// |F|F-JF---7F7-L7L|7|
-// |FFJF7L7F-JF7|JL---7
-// 7-L-JL7||F7|L7F-7F7|
-// L.L7LFJ|||||FJL7||LJ
-// L7JLJL-JLJLJL--JLJ.L"#, part2, None);
-
+    aoc2023::utils::run(INPUT, part1, Some(6768));
+    aoc2023::utils::run(INPUT, part2, Some(351));
 }
 
 #[allow(dead_code)]
