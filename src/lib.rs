@@ -46,36 +46,35 @@ pub mod grid {
             result
         }
 
-        pub fn rows_where(&self, predicate: fn(char) -> bool) -> Vec<usize> {
-            let mut result = Vec::new();
-            for y in 0..self.height {
-                let mut found = true;
-                for x in 0..self.width {
-                    found &= predicate(self.grid[y][x]);
-                }
+        // pub fn rows_where(&self, predicate: fn(char) -> bool) -> Vec<usize> {
+        //     let mut result = Vec::new();
+        //     for y in 0..self.height {
+        //         let mut found = true;
+        //         for x in 0..self.width {
+        //             found &= predicate(self.grid[y][x]);
+        //         }
+        //         if !found {
+        //             continue;
+        //         }
+        //         result.push(y);
+        //     }
+        //     result
+        // }
 
-                if !found {
-                    continue;
-                }
-                result.push(y);
-            }
-            result
-        }
-
-        pub fn columns_where(&self, predicate: fn(char) -> bool) -> Vec<usize> {
-            let mut result = Vec::new();
-            for x in 0..self.width {
-                let mut found = true;
-                for y in 0..self.height {
-                    found &= predicate(self.grid[y][x]);
-                }
-                if !found {
-                    continue;
-                }
-                result.push(x);
-            }
-            result
-        }
+        // pub fn columns_where(&self, predicate: fn(char) -> bool) -> Vec<usize> {
+        //     let mut result = Vec::new();
+        //     for x in 0..self.width {
+        //         let mut found = true;
+        //         for y in 0..self.height {
+        //             found &= predicate(self.grid[y][x]);
+        //         }
+        //         if !found {
+        //             continue;
+        //         }
+        //         result.push(x);
+        //     }
+        //     result
+        // }
 
         pub fn clone_column(&mut self, x: usize) -> Result<(), String> {
             for y in 0..self.height {
@@ -94,44 +93,46 @@ pub mod grid {
         }
 
 
-        pub fn column_where(&self, predicate: fn(char) -> bool) -> Option<Vec<Point>> {
+        pub fn columns_where(&self, predicate: fn(char) -> bool) -> Vec<Vec<Point>> {
+            let mut result = Vec::new();
             for x in 0..self.width {
                 let mut found = true;
                 for y in 0..self.height {
                     found &= predicate(self.grid[y][x]);
                 }
 
-                if !found {
-                    let mut result = Vec::new();
+                if found {
+                    let mut column = Vec::new();
                     for y in 0..self.height {
                         if predicate(self.grid[y][x]) {
-                            result.push(Point::new(x as i32, y as i32));
+                            column.push(Point::new(x as i32, y as i32));
                         }
                     }
-                    return Some(result);
+                    result.push(column);
                 }
             }
-            None
+            result
         }
 
-        pub fn row_where(&self, predicate: fn(char) -> bool) -> Option<Vec<Point>> {
+        pub fn rows_where(&self, predicate: fn(char) -> bool) -> Vec<Vec<Point>> {
+            let mut result = Vec::new();
             for y in 0..self.height {
-                let mut found = false;
+                let mut found = true;
                 for x in 0..self.width {
-                    found = found || predicate(self.grid[y][x]);
+                    found &= predicate(self.grid[y][x]);
                 }
 
                 if found {
-                    let mut result = Vec::new();
+                    let mut row = Vec::new();
                     for x in 0..self.width {
                         if predicate(self.grid[y][x]) {
-                            result.push(Point::new(x as i32, y as i32));
+                            row.push(Point::new(x as i32, y as i32));
                         }
                     }
-                    return Some(result);
+                    result.push(row);
                 }
             }
-            None
+            result
         }
 
 
@@ -140,6 +141,12 @@ pub mod grid {
                 line.push(c);
             }
             self.width += 1;
+        }
+
+        pub fn paint_path(&mut self, path: &Vec<Point>, c: char) {
+            for p in path.iter() {
+                self.grid[p.y as usize][p.x as usize] = c;
+            }
         }
 
     }
